@@ -1,0 +1,98 @@
+version: '3'
+
+networks:
+  observer-net:
+    driver: bridge
+    enable_ipv6: false
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.18.0.0/16
+          gateway: 172.18.0.1
+    internal: false
+
+
+
+services:
+  redis:
+    image: redis
+    networks:
+      - observer-net
+    container_name: redis
+    restart: always
+    command: ["redis-server", "--client-output-buffer-limit", "slave 836870912 836870912 30 pubsub 836870912 836870912 30"]
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+
+
+  observer:
+    networks:
+      - observer-net
+    volumes:
+      - ./configs:/video_observer/configs
+      - ./public:/video_observer/public
+    build:
+      context: .
+      dockerfile: Dockerfile-observer
+    image: rv/video/observer/app:1.0.5
+    container_name: video-observer
+    logging:
+      driver: json-file
+      options:
+        max-size: 160m
+    depends_on:
+      - redis
+      - receiver
+
+    stop_signal: SIGINT
+    restart: always
+
+
+  receiver:
+    networks:
+      - observer-net
+    environment:
+      - C_FORCE_ROOT=true
+    volumes:
+      - ./public:/video_observer/public
+    build:
+      context: .
+      dockerfile: Dockerfile-celery
+      target: celery-builder
+    image: rv/video/observer/receiver/rtmp:1.0.3
+    container_name: video-celery-receiver-rtmp
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+    depends_on:
+      - redis
+    restart: always
+
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./nginx.conf.d:/etc/nginx/conf.d
+    networks:
+      - observer-net
+    logging:
+      driver: json-file
+      options:
+        max-size: 80m
+    depends_on:
+      - observer
+
+
+  # core:
+    #   build:
+    #     context: .
+    #     dockerfile: Dockerfile
+    #     target: builder
+        
+    #   image: video/observer/core
