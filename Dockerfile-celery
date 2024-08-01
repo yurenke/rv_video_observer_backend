@@ -15,4 +15,4 @@ RUN pip install redis==5.0.0
 
 ENV REDIS_ALIAS=redis
 
-CMD celery -A bg_celery.tasks worker --loglevel=WARNING --concurrency=16 --purge --discard
+CMD celery -A bg_celery.tasks worker --loglevel=WARNING --concurrency=8 --purge --discard

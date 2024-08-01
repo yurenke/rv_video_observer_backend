@@ -96,6 +96,7 @@ class VideoDataset():
                     'id': _vid,
                     'img': '/public/addr/{}.jpg'.format(_vid),
                     'src': 1,
+                    'status': VideoFlagENum(_flag),
                     'flag': VideoFlagENum(_flag),
                     # 'ontime': True,
                     'minute_last': -1,
@@ -125,6 +126,7 @@ class VideoDataset():
                     'id': _vid,
                     'img': '/public/addr2/{}.jpg'.format(_vid),
                     'src': 2,
+                    'status': VideoFlagENum(_flag),
                     'flag': VideoFlagENum(_flag),
                     # 'ontime': True,
                     'minute_last': -1,
@@ -170,6 +172,7 @@ class VideoDataset():
                 idx = map_vidx.get(_vid, -1)
                 if idx >= 0 and idx < len(videos):
                     videos[idx]['url'] = _addr
+                    videos[idx]['status'] = VideoFlagENum(_flag)
                     videos[idx]['flag'] = VideoFlagENum(_flag)
 
             if _vid and _addr2:
@@ -179,6 +182,7 @@ class VideoDataset():
                 idx = map_vidx2.get(_vid, -1)
                 if idx >= 0 and idx < len(videos2):
                     videos2[idx]['url'] = _addr2
+                    videos2[idx]['status'] = VideoFlagENum(_flag)
                     videos2[idx]['flag'] = VideoFlagENum(_flag)
         self.logging('[PROCESS] Refresh Video Data Done.')
 
@@ -189,6 +193,13 @@ class VideoDataset():
         return {'addrVideos': [self.get_dict_by_keys(_, ['id', 'img', 'src', 'flag', 'wrongs', 'warning']) for _ in self.construct_videos],
                 'addr2Videos': [self.get_dict_by_keys(_, ['id', 'img', 'src', 'flag', 'wrongs', 'warning']) for _ in self.construct_videos2]}
 
+
+    def refresh_construct_flags(self):
+        for v in self.construct_videos:
+            v['flag'] = v['status']
+        
+        for v in self.construct_videos2:
+            v['flag'] = v['status']
 
     def get_urls(self, is_activate:bool = True) -> list[dict]:
         """ get dict[id, url, flag] all videos, if parameter is_activated is True then filter only opened video

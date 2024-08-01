@@ -136,10 +136,11 @@ class VideoSocketIO(SocketIO):
         TIMEOUT_CYCLE_CAPTURING = self.flask_app.config['HANDLER'].get('VIDEO_PROCESS_TIMEOUT', 60)
 
         while not self.evt_exit_background.is_set():
+            self.data_ctl.refresh_construct_flags()
             pid_urls = self.data_ctl.get_urls(is_activate=True)
             self.celery_frame_tasks = [celery_task.capture_video.delay(_['id'], _['src'], _['url'], self.dir_public) for _ in pid_urls]
             self.evt_video_handling = threading.Event()
-            self.while_working_by_celery_tasks(timeout=TIMEOUT_CYCLE_CAPTURING)
+            self.while_working_by_celery_tasks(id_src_urls=pid_urls, timeout=TIMEOUT_CYCLE_CAPTURING)
             self.reload_tasks()
             self.check_video_status_hourly()
             # 
@@ -155,10 +156,11 @@ class VideoSocketIO(SocketIO):
 
 
 
-    def while_working_by_celery_tasks(self, timeout:float=60):
+    def while_working_by_celery_tasks(self, id_src_urls:list=[], timeout:float=180):
         dt_start = datetime.utcnow()
         self.next_round_done_video_src_id_map = {}
         video_data_update_to_fronted = []
+        not_open_src_ids = set([str(_['src']) + '_' + _['id'] for _ in id_src_urls])
         
         while not self.evt_exit_background.is_set():
             tasks = self.celery_frame_tasks
@@ -168,12 +170,14 @@ class VideoSocketIO(SocketIO):
             _len_results = len(results)
             if _len_results > 0:
                 new_results = [_ for _ in results if self.next_round_done_video_src_id_map.get(str(_['src']) + '_' + _['pid'], None) is None and _['opened']]
+                # new_results = []
                 updated_src_ids = self.handle_video_tasks(new_results) # it will take a long time to execute
                 if len(updated_src_ids) == 0:
                     self.evt_exit_background.wait(2)
                 else:
                     for src_pid in updated_src_ids:
                         self.next_round_done_video_src_id_map[src_pid] = True
+                        not_open_src_ids.remove(src_pid)
                     video_data_update_to_fronted = self.data_ctl.get_ws_video_data_by_ids(updated_src_ids)
                     self.emit('video_data_update', video_data_update_to_fronted)
             else:
@@ -182,7 +186,7 @@ class VideoSocketIO(SocketIO):
             is_timeout = (datetime.utcnow() - dt_start).total_seconds() > timeout
 
             if _len_results >= length_tasks or is_timeout:
-                not_open_src_ids = [str(res['src']) + '_' + res['pid'] for res in results if not res['opened']]
+                # not_open_src_ids = [str(res['src']) + '_' + res['pid'] for res in results if not res['opened']]
                 length_not_open = len(not_open_src_ids)
 
                 length_finish = len(self.next_round_done_video_src_id_map)
